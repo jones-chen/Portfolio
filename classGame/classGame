@@ -178,14 +178,14 @@ class fighting:
             return KeepFighting
         
 # 創立玩家-姓名、職業
-playerName = input("請輸入你的name：")
+userName = input("請輸入你的name：")
 while True:
-    Profession = input("請選擇你要的職業：\n(1)戰士-血較多,MP較少\n(2)法師-血較少,攻擊力較高")
+    Profession = int(input("請選擇你要的職業：\n(1)戰士-血較多,MP較少\n(2)法師-血較少,攻擊力較高\n"))
     if Profession == 1 :
-        player1 = warrior(playerName)
+        player1 = warrior(userName)
         break
     elif Profession == 2:
-        player1 = mage(playerName)
+        player1 = mage(userName)
         break
     else :
         print('職業輸入錯誤，請輸入數字，請重新輸入！')
