@@ -1,0 +1,225 @@
+# 回合式戰鬥遊戲
+import random
+
+#技能模型
+def attackSkill(name, describe, fight_describe, costMP, HPharm_type, HPharm_para):
+    return {'name':name,'describe':describe, 'fight_describe':fight_describe, 'costMP':costMP, 'HPharm_type':HPharm_type,'HPharm_para':HPharm_para}
+def defenseSkill(name, describe, fight_describe, defense_type, defense_para): #defense_para 為減少的傷害%數，0是完全減免，1是承受全部
+    return {'name':name,'describe':describe, 'fight_describe':fight_describe,'defense_type':defense_type, 'defense_para':defense_para}              
+ 
+#戰士基本資料        
+class warrior():
+    def __init__(self, name):
+        self.name = name
+        self.HP = 200
+        self.MP = 60
+        self.attackList =[
+            attackSkill('普通攻擊','造成一定數值的傷害','衝上去砍了一劍',0,'fixed',50),
+            attackSkill('迴旋揮砍','有機率造成更大傷害','奮力使出了向對方瘋狂揮砍！',20,'range',(50,100))]
+        self.defenseList =[
+            defenseSkill('格檔','減少一半的傷害','擺出了格擋姿勢','fixed',0.5),
+            defenseSkill('閃避','有沒有躲開只有一念之間','趕緊往後面跳一步','choice',[0,1])]
+
+#法師基本資料
+class mage():
+    def __init__(self, name):
+        self.name = name
+        self.HP = 100
+        self.MP = 300
+        self.attackList =[
+            attackSkill('魔杖敲打','造成一定數值的傷害','拿起魔杖瘋狂敲打敵方',0,'fixed',20),
+            attackSkill('火球術','有機率造成更大傷害','將對方燒成一團火球',30,'range',(50,100)),
+            attackSkill('神降隕','大量消耗MP造成巨大傷害','憤怒的向天詠唱！此時天空降起了隕石雨！',100,'range',(100,200))]
+        self.defenseList =[
+            defenseSkill('格檔','減少一半的傷害','擺出了防禦姿勢','fixed',0.5),
+            defenseSkill('閃避','有沒有躲開只有一念之間','趕緊往後面跳一步','choice',[0,1])]
+
+#顯示板相關
+class showMonitor:
+    def __init__(self, player1, player2):
+        playerName1 = player1.name
+        playerName2 = player2.name
+        print(f'{playerName1} vs {playerName2}，戰鬥開始！')
+        players = [player1,player2]
+        random.shuffle(players)
+        self.AttackPlayer = players[0]
+        self.defensePlayer = players[1]
+        self.round = 0
+
+    def main(self, player1, player2):
+        self.round += 1
+        print(f'''
+┌---------------------------------------------------------------------
+| {player1.name} | 血量(HP)：{player1.HP} | 魔力(MP)：{player1.MP} 
+| {player2.name} | 血量(HP)：{player2.HP} | 魔力(MP)：{player2.MP} 
+└---------------------------------------------------------------------
+【第{self.round}回合，現在是 {self.AttackPlayer.name} 的攻擊回合】''')
+        return self.AttackPlayer
+    def changeRole(self):
+        a = self.AttackPlayer
+        b = self.defensePlayer
+        self.AttackPlayer = b
+        self.defensePlayer = a
+
+#戰鬥相關
+class fighting:
+    # 計算MP是否足夠
+    def MPcheck(player, attackOrder):
+        nowMP = player.MP
+        costMP = attackOrder['costMP']
+        return  costMP > nowMP #無法使用技能，返回True
+    
+    # 攻擊減少MP，並計算攻擊力
+    def attackHP(playerAttack, attackOrder):
+        #扣除MP
+        playerAttack.MP -= attackOrder['costMP']
+
+        if attackOrder['HPharm_type'] == 'fixed' :
+            attackHP = attackOrder['HPharm_para']
+        elif attackOrder['HPharm_type'] == 'range' :
+            a, b = attackOrder['HPharm_para']
+            attackHP =  random.randint(a,b)
+        else:
+            print(f'fighting - attackHP - AttackOrder[HPharm_type]有錯誤！{attackOrder["HPharm_type"]}')
+            attackHP =  False
+            
+        print(f"{playerAttack.name} 使出了{attackOrder['name']}，{attackOrder['fight_describe']}！發出了{attackHP}點的殺傷力！")
+        print('')
+        return attackHP
+        
+    # 防禦折抵
+    def defenseCalculation(player, order):
+        if order['defense_type'] == 'fixed' :
+            defenseGain = order['defense_para']
+        elif order['defense_type'] == 'range' :
+            defenseGain = random.randint(order['defense_para'])
+        elif order['defense_type'] == 'choice' :
+            defenseGain = random.choice(order['defense_para'])
+        else:
+            print(f'fighting - defenseCalculation 有錯誤！{order["defense_type"]}')
+        
+        print(f"{player.name} 趕緊 {order['name']} ，{order['fight_describe']}！")
+        print(f"{player.name} {order['name']}了 {int((1-defenseGain)*100)}% 的傷害！\n")
+        return defenseGain
+            
+    # 損血計算
+    def HPLossCalculation(playerAttack, AttackOrder, playerDefense, defenseOrder):
+        attackHP = fighting.attackHP(playerAttack, AttackOrder)
+        defenseGain = fighting.defenseCalculation(playerDefense, defenseOrder)
+        HPLoss = int(attackHP*defenseGain)
+
+        print(f"{playerAttack.name} 對 {playerDefense.name} 造成了 {HPLoss}點 的傷害！")
+
+        # 剩餘血量
+        playerDefense.HP = playerDefense.HP - HPLoss
+        if playerDefense.HP <= 0 :
+            playerDefense.HP = 0
+        print(f"{playerDefense.name} 剩下 {playerDefense.HP}點的血量！")
+    
+    # 確認勝負
+    def KeepFighting(player1, player2):
+        if player1.HP <= 0 :
+            print(f"{player1.name} 受傷過重倒下了，{player2.name} 獲勝了！")
+            print(f"闖關失敗，遊戲結束。")
+            return False #結束對戰
+        elif player2.HP <= 0 :
+            print(f"{player2.name} 受傷過重倒下了，{player1.name} 獲勝了！")
+            print(f"恭喜闖關成功！")
+            return False #結束對戰
+        else:
+            return True #繼續對戰
+
+    # 玩家攻擊
+    def userAttack(player1,player2):
+        # 顯示技能
+        num = 0
+        for per_attack in player1.attackList :
+            num += 1
+            AttackName = per_attack['name']
+            AttackDescribe = per_attack['describe']
+            AttackCostMP = per_attack['costMP']
+            print(f'({num}) {AttackName} - {AttackDescribe} (消耗 {AttackCostMP} MP)')
+        attackOrder = int(input(f"請輸入您的攻擊指令："))
+        AttackOrder = player1.attackList[attackOrder-1] #讀取攻擊指令 
+        
+        #確認MP是否足夠，不足夠則重選
+        while fighting.MPcheck(player1, AttackOrder) : #若MP不夠, 則返回True
+            attackOrder = int(input(f"MP不足，請選擇其他技能。請輸入您的攻擊指令："))
+            AttackOrder = player1.attackList[attackOrder-1] #讀取攻擊指令 
+        else : #如果足夠
+            print('')
+            defenseOrder = random.choice(player2.defenseList) #player2 作防禦行動
+            fighting.HPLossCalculation(player1, AttackOrder, player2, defenseOrder)
+            KeepFighting = fighting.KeepFighting(player1, player2)
+            return KeepFighting
+
+    # 玩家防禦
+    def userDefense(player1,player2):
+        # 顯示技能
+        num = 0
+        for per_defense in player1.defenseList :
+            num += 1
+            defenseName = per_defense['name']
+            defenseDescribe = per_defense['describe']
+            print(f'({num}) {defenseName} - {defenseDescribe}')
+        defenseOrder = int(input(f"請輸入您的防禦指令："))
+        defenseOrder = player1.defenseList[defenseOrder-1] #讀取防禦指令 
+        
+        # 電腦攻擊
+        AttackOrder = random.choice(player2.attackList) #player2 作攻擊行動   
+        # 確認電腦MP是否足夠，不足夠則重選
+        while fighting.MPcheck(player2, AttackOrder) : #若MP不夠, 則返回True
+            player2.attackList.remove(AttackOrder)
+            AttackOrder = random.choice(player2.attackList) #player2 作攻擊行動
+        else : #如果足夠
+            print('')
+            fighting.HPLossCalculation(player2, AttackOrder, player1, defenseOrder)
+            KeepFighting = fighting.KeepFighting(player1, player2)
+            return KeepFighting
+        
+# 創立玩家-姓名、職業
+playerName = input("請輸入你的name：")
+while True:
+    Profession = input("請選擇你要的職業：\n(1)戰士-血較多,MP較少\n(2)法師-血較少,攻擊力較高")
+    if Profession == 1 :
+        player1 = warrior(playerName)
+        break
+    elif Profession == 2:
+        player1 = mage(playerName)
+        break
+    else :
+        print('職業輸入錯誤，請輸入數字，請重新輸入！')
+
+# userName = '天下無雙'
+# Profession = 2
+# player1 = mage(userName)
+
+# 創立對手-姓名、角色
+opponentName = random.choice(['馬里個乖狗狗', '鼠來寶', '迷霧柏爾','可可'])
+opponentProfession = random.choice(['戰士', '法師'])
+if opponentProfession == '戰士' :
+    player2 = warrior(opponentName)
+elif opponentProfession == '法師':
+    player2 = mage(opponentName)
+else :
+    print(f'player2 職業錯誤-{opponentProfession}')
+print(f'您的對手是 {opponentName}，對方的職業是 {opponentProfession}')
+
+# 回合開始
+systemMonitor = showMonitor(player1,player2)
+
+# 每回合
+KeepFighting = True
+while KeepFighting:
+    # 顯示狀態
+    AttackPlayer = systemMonitor.main(player1, player2)    
+    # 玩家攻擊
+    if AttackPlayer.name == userName :
+        KeepFighting = fighting.userAttack(player1,player2)
+    # 玩家防禦
+    else : 
+        KeepFighting = fighting.userDefense(player1,player2)
+    # 交換攻防
+    systemMonitor.changeRole()
+
+        
